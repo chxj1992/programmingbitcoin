@@ -116,7 +116,17 @@ class Tx:
         # parse num_outputs number of TxOuts
         # locktime is an integer in 4 bytes, little-endian
         # return an instance of the class (see __init__ for args)
-        raise NotImplementedError
+        version = little_endian_to_int(s.read(4))
+        num_inputs = read_varint(s)
+        tx_ins = []
+        for i in range(num_inputs):
+            tx_ins.append(TxIn.parse(s))
+        num_outputs = read_varint(s)
+        tx_outs = []
+        for i in range(num_outputs):
+            tx_outs.append(TxOut.parse(s))
+        locktime = little_endian_to_int(s.read(4))
+        return Tx(version, tx_ins, tx_outs, locktime)
 
     # tag::source6[]
     def serialize(self):
@@ -137,8 +147,10 @@ class Tx:
         # initialize input sum and output sum
         # use TxIn.value() to sum up the input amounts
         # use TxOut.amount to sum up the output amounts
-        # fee is input sum - output sum
-        raise NotImplementedError
+        # fee is input sum - output sum        
+        input_sum = sum([i.value() for i in self.tx_ins])
+        output_sum = sum([i.amount for i in self.tx_outs])
+        return input_sum - output_sum
 
 
 # tag::source2[]
@@ -169,7 +181,11 @@ class TxIn:
         # use Script.parse to get the ScriptSig
         # sequence is an integer in 4 bytes, little-endian
         # return an instance of the class (see __init__ for args)
-        raise NotImplementedError
+        prev_tx = s.read(32)[::-1]
+        prev_index = little_endian_to_int(s.read(4))
+        script_sig = Script.parse(s)
+        sequence = little_endian_to_int(s.read(4))
+        return cls(prev_tx, prev_index, script_sig, sequence)
 
     # tag::source5[]
     def serialize(self):
@@ -220,7 +236,9 @@ class TxOut:
         # amount is an integer in 8 bytes, little endian
         # use Script.parse to get the ScriptPubKey
         # return an instance of the class (see __init__ for args)
-        raise NotImplementedError
+        amount = little_endian_to_int(s.read(8))
+        script_pubkey = Script.parse(s)
+        return cls(amount, script_pubkey)
 
     # tag::source4[]
     def serialize(self):  # <1>
