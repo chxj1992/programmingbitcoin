@@ -174,7 +174,17 @@ class Tx:
         # add SIGHASH_ALL using int_to_little_endian in 4 bytes
         # hash256 the serialization
         # convert the result to an integer using int.from_bytes(x, 'big')
-        raise NotImplementedError
+        stream = BytesIO(self.serialize())
+        transaction = Tx.parse(stream, self.testnet)
+        for i, tx_in in enumerate(transaction.tx_ins):
+            if i == input_index:
+                transaction.tx_ins[i] = TxIn(prev_tx=tx_in.prev_tx, prev_index=tx_in.prev_index, script_sig=tx_in.script_pubkey(self.testnet), sequence=tx_in.sequence)
+            else:
+                transaction.tx_ins[i] = TxIn(prev_tx=tx_in.prev_tx, prev_index=tx_in.prev_index, script_sig=None, sequence=tx_in.sequence)
+        serialized_tx = transaction.serialize() + int_to_little_endian(SIGHASH_ALL, 4)
+        h256 = hash256(serialized_tx)
+        return int.from_bytes(h256, 'big')
+
 
     def verify_input(self, input_index):
         '''Returns whether the input has a valid signature'''
@@ -183,7 +193,11 @@ class Tx:
         # get the signature hash (z)
         # combine the current ScriptSig and the previous ScriptPubKey
         # evaluate the combined script
-        raise NotImplementedError
+        tx_in = self.tx_ins[input_index]
+        script_pubkey = tx_in.script_pubkey()
+        z = self.sig_hash(input_index)
+        return (tx_in.script_sig + script_pubkey).evaluate(z)
+
 
     # tag::source2[]
     def verify(self):
@@ -204,7 +218,13 @@ class Tx:
         # initialize a new script with [sig, sec] as the cmds
         # change input's script_sig to new script
         # return whether sig is valid using self.verify_input
-        raise NotImplementedError
+        z = self.sig_hash(input_index)
+        sig = private_key.sign(z).der() + SIGHASH_ALL.to_bytes(1, 'big')
+        sec = private_key.point.sec()
+        script_sig = Script([sig, sec])
+        self.tx_ins[input_index].script_sig = script_sig
+        return self.verify_input(input_index)
+        
 
 
 class TxIn:
